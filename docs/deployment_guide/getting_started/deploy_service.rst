@@ -122,7 +122,7 @@ Create the master encryption key (MEK) for database encryption:
 
    .. code-block:: json
 
-      {"k":"<base64-encoded-32-byte-key>","kid":"key1","kty":"oct"}
+      {"k":"<base64-encoded-32-byte-key>","kid":"<unique-key-id>","kty":"oct"}
 
 2. **Generate the key using OpenSSL**:
 
@@ -131,8 +131,11 @@ Create the master encryption key (MEK) for database encryption:
       # Generate a 32-byte (256-bit) random key and base64 encode it
       $ export RANDOM_KEY=$(openssl rand -base64 32 | tr -d '\n')
 
+      # Generate a unique key ID to detect key material mismatches during rotation
+      $ export KID="key-$(openssl rand -hex 8)"
+
       # Create the JWK format
-      $ export JWK_JSON="{\"k\":\"$RANDOM_KEY\",\"kid\":\"key1\",\"kty\":\"oct\"}"
+      $ export JWK_JSON="{\"k\":\"$RANDOM_KEY\",\"kid\":\"$KID\",\"kty\":\"oct\"}"
 
 3. **Base64 encode the entire JWK**:
 
@@ -140,6 +143,11 @@ Create the master encryption key (MEK) for database encryption:
 
       $ export ENCODED_JWK=$(echo -n "$JWK_JSON" | base64 | tr -d '\n')
       $ echo $ENCODED_JWK
+
+.. tip::
+   If the ``mek-config`` ConfigMap already exists from a previous deployment,
+   skip this step. Re-creating it with new key material will make existing
+   encrypted database values unreadable.
 
 4. **Create the ConfigMap with your generated MEK**:
 
@@ -153,9 +161,9 @@ Create the master encryption key (MEK) for database encryption:
         namespace: osmo
       data:
         mek.yaml: |
-          currentMek: key1
+          currentMek: $KID
           meks:
-            key1: $ENCODED_JWK
+            $KID: $ENCODED_JWK
       EOF
 
 .. warning::
@@ -165,6 +173,11 @@ Create the master encryption key (MEK) for database encryption:
    - Never commit the MEK to version control
    - Use a secure key management system, such as Vault or secrets manager in production
    - The MEK is used to encrypt sensitive data in the database
+
+.. note::
+   Each MEK must have a **unique** ``kid`` (key ID). A unique identifier allows the
+   system to detect when the MEK ConfigMap has been regenerated with different key
+   material, preventing silent data corruption from mismatched encryption keys.
 
 **Example MEK generation script**:
 
@@ -176,8 +189,11 @@ Create the master encryption key (MEK) for database encryption:
    # Generate random 32-byte key
    $ export RANDOM_KEY=$(openssl rand -base64 32 | tr -d '\n')
 
+   # Generate a unique key ID
+   $ export KID="key-$(openssl rand -hex 8)"
+
    # Create JWK
-   $ export JWK_JSON="{\"k\":\"$RANDOM_KEY\",\"kid\":\"key1\",\"kty\":\"oct\"}"
+   $ export JWK_JSON="{\"k\":\"$RANDOM_KEY\",\"kid\":\"$KID\",\"kty\":\"oct\"}"
 
    # Base64 encode the JWK
    $ export ENCODED_JWK=$(echo -n "$JWK_JSON" | base64 | tr -d '\n')
@@ -192,9 +208,9 @@ Create the master encryption key (MEK) for database encryption:
      namespace: osmo
    data:
      mek.yaml: |
-       currentMek: key1
+       currentMek: $KID
        meks:
-         key1: $ENCODED_JWK
+         $KID: $ENCODED_JWK
    EOF
 
 

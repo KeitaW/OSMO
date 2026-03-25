@@ -2709,6 +2709,11 @@ class DynamicConfig(ExtraArgBaseModel):
                 return result_data, None
             elif isinstance(encrypted_data, pydantic.SecretStr):
                 secret = encrypted_data.get_secret_value()
+                if not secret:
+                    # Skip empty strings — jwcrypto 1.5.x treats
+                    # decrypted b'' as falsy and raises InvalidJWEData
+                    # even on successful decryption.
+                    return '', None
                 jwetoken = jwe.JWE()
                 try:
                     jwetoken.deserialize(secret)
@@ -2771,10 +2776,10 @@ class DynamicConfig(ExtraArgBaseModel):
         # Delete configs with stale encryption — forces regeneration via
         # _init_configs() → _set_default_config() → INSERT ON CONFLICT DO NOTHING.
         # Must include type in WHERE clause — configs PK is (key, type).
-        config_type = dynamic_config.get_type().value
-        for key in delete_keys:
-            cmd = 'DELETE FROM configs WHERE key = %s AND type = %s;'
-            postgres.execute_commit_command(cmd, (key, config_type))
+        if delete_keys:
+            config_type = dynamic_config.get_type().value
+            cmd = 'DELETE FROM configs WHERE key = ANY(%s) AND type = %s;'
+            postgres.execute_commit_command(cmd, (list(delete_keys), config_type))
 
         return dynamic_config
 
