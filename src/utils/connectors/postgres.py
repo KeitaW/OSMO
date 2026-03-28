@@ -2726,17 +2726,32 @@ class DynamicConfig(ExtraArgBaseModel):
                     if PostgresConnector._is_jwe_compact(secret):
                         # Value is already JWE-encrypted but cannot be decrypted
                         # with the current MEK. This happens when the MEK ConfigMap
-                        # is regenerated with new key material. Delete the stale
-                        # config row so _init_configs() regenerates it with a fresh
-                        # default on the next startup.
+                        # is regenerated with new key material.
                         # See https://github.com/NVIDIA/OSMO/issues/731
-                        logging.error(
-                            "Cannot decrypt config key '%s' with current MEK: "
-                            "key material mismatch. Deleting stale config so "
-                            "the service regenerates it on next startup. "
-                            "See https://github.com/NVIDIA/OSMO/issues/731",
-                            top_level_key)
-                        delete_keys.add(top_level_key)
+                        #
+                        # Only delete configs that have a default_factory (can be
+                        # regenerated, e.g. service_auth RSA keypairs). Credential-
+                        # bearing configs (workflow_data, workflow_log) default to
+                        # None and cannot be regenerated — keep the stale row so
+                        # the PATCH API can overwrite it.
+                        field_info = cls.__fields__.get(top_level_key)
+                        has_factory = (field_info is not None
+                                       and field_info.default_factory is not None)
+                        if has_factory:
+                            logging.error(
+                                "Cannot decrypt config key '%s' with current MEK: "
+                                "key material mismatch. Deleting stale config so "
+                                "the service regenerates it on next startup. "
+                                "See https://github.com/NVIDIA/OSMO/issues/731",
+                                top_level_key)
+                            delete_keys.add(top_level_key)
+                        else:
+                            logging.warning(
+                                "Cannot decrypt config key '%s' with current MEK: "
+                                "key material mismatch. Keeping stale row (no "
+                                "default_factory — must be re-set via API). "
+                                "See https://github.com/NVIDIA/OSMO/issues/731",
+                                top_level_key)
                         return '', None
                     # Genuinely unencrypted plaintext — encrypt it
                     encrypted = postgres.secret_manager.encrypt(secret, '')
