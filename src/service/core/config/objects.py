@@ -29,9 +29,10 @@ from src.utils.connectors.postgres import ListOrder
 DEFAULT_POD_TEMPLATES : dict[str, dict] = {
     'default_ctrl': {
         'spec': {
-            'containers': [
+            'initContainers': [
                 {
                     'name': 'osmo-ctrl',
+                    'restartPolicy': 'Always',
                     'resources': {
                         'limits': {
                             'cpu': '{{USER_CPU}}',
@@ -45,7 +46,8 @@ DEFAULT_POD_TEMPLATES : dict[str, dict] = {
                         }
                     }
                 }
-            ]
+            ],
+            'terminationGracePeriodSeconds': 600,
         }
     },
     'default_user': {
