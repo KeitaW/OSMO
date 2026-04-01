@@ -325,6 +325,11 @@ def set_default_backend_images(postgres: connectors.PostgresConnector):
 def set_default_service_url(postgres: connectors.PostgresConnector):
     curr_service_configs = postgres.get_service_configs()
 
+    logging.info(
+        'set_default_service_url: hostname=%s, current=%s',
+        postgres.config.service_hostname,
+        curr_service_configs.service_base_url)
+
     if postgres.config.service_hostname:
         expected_url = f'https://{postgres.config.service_hostname}'
 
