@@ -199,7 +199,9 @@ class K8sObjectFactory:
                              {'name': 'osmo-data', 'mountPath': DATA_LOCATION +
                               '/output', 'subPath': 'output', 'readOnly': True},
                              {'name': 'osmo-login', 'mountPath': common.LOGIN_LOCATION +
-                              '/config', 'subPath': 'ctrl/config'}],
+                              '/config', 'subPath': 'ctrl/config'},
+                             {'name': 'osmo-usr-bin', 'mountPath': common.USER_BIN_LOCATION,
+                              'readOnly': True}],
             'command': ['/osmo/bin/osmo_ctrl'],
             'args': ['-socketPath', DATA_LOCATION + '/socket/data.sock',
                      '-inputPath', DATA_LOCATION + '/input/',
@@ -213,6 +215,10 @@ class K8sObjectFactory:
 
         container['args'] += extra_args
         container['env'] = [
+            {
+                'name': 'PATH',
+                'value': f'{common.USER_BIN_LOCATION}:/usr/local/bin:/usr/bin:/bin',
+            },
             {
                 'name': 'OSMO_CONFIG_FILE_DIR',
                 'valueFrom': {

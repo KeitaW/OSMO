@@ -153,6 +153,9 @@ def get_static_data_credential_from_config(
 
         if 'auth' in configs and 'data' in configs['auth'] and url in configs['auth']['data']:
             data_cred_dict = configs['auth']['data'][url]
+            # Skip if no static keys — fall through to DefaultDataCredential
+            if 'access_key_id' not in data_cred_dict or 'access_key' not in data_cred_dict:
+                return None
             data_cred = StaticDataCredential(
                 access_key_id=data_cred_dict['access_key_id'],
                 access_key=pydantic.SecretStr(data_cred_dict['access_key']),

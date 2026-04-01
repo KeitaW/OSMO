@@ -17,9 +17,9 @@
 # Define a constant for the base image URL
 BASE_DISTROLESS_IMAGE_URL = "nvcr.io/nvidia/distroless/"
 
-BASE_IMAGE_URL = "nvcr.io/nvidia/osmo/"
+BASE_IMAGE_URL = "159553542841.dkr.ecr.us-west-2.amazonaws.com/osmo-service-patched/"
 
-IMAGE_TAG = ""
+IMAGE_TAG = "dev"
 
 ################
 #  Workspace   #

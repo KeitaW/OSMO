@@ -1009,6 +1009,11 @@ def _run_check_command(service_client: client.ServiceClient, args: argparse.Name
         # Auth check failed (credentials issue)
         print(json.dumps({'status': 'fail', 'error': str(err)}))
 
+    except Exception as err:
+        # Any other error (IAM simulation denied, API unavailable, etc.)
+        # must return structured JSON so osmo-ctrl can parse it
+        print(json.dumps({'status': 'fail', 'error': f'Unexpected error during data auth check: {err}'}))
+
 
 def setup_parser(parser: argparse._SubParsersAction):
     """

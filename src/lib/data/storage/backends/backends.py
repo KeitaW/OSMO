@@ -27,6 +27,7 @@ from typing_extensions import assert_never, override
 from urllib import parse
 
 import boto3
+import botocore.exceptions
 import mypy_boto3_iam.client
 import mypy_boto3_sts.client
 import pydantic
@@ -542,6 +543,18 @@ class S3Backend(Boto3Backend):
         try:
             _ = client.execute_api(_validate_auth, s3.S3ErrorHandler())
         except client.OSMODataStorageClientError as err:
+            # Check if the root cause is AccessDenied on iam:SimulatePrincipalPolicy
+            # (common with IRSA / cross-account assumed roles that lack this permission).
+            # Fall back to a simple bucket-level access check.
+            root_cause = err.__cause__
+            if isinstance(root_cause, botocore.exceptions.ClientError):
+                error_code = root_cause.response.get('Error', {}).get('Code', '')
+                if error_code in ('AccessDenied', 'AccessDeniedException', 'InvalidInput'):
+                    logging.info(
+                        'IAM policy simulation unavailable (%s), '
+                        'falling back to bucket access check', error_code)
+                    self._validate_bucket_access(data_cred=data_cred)
+                    return
             raise osmo_errors.OSMOCredentialError(
                 f'Data key validation error: {err.message}: {err.__cause__}')
 
