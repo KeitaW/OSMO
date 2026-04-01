@@ -325,23 +325,30 @@ def set_default_backend_images(postgres: connectors.PostgresConnector):
 def set_default_service_url(postgres: connectors.PostgresConnector):
     curr_service_configs = postgres.get_service_configs()
 
-    # If service_base_url is already set, do not override it
-    if curr_service_configs.service_base_url:
+    if postgres.config.service_hostname:
+        expected_url = f'https://{postgres.config.service_hostname}'
+
+        # Always reconcile service_base_url with the deployment hostname.
+        # A stale internal URL (from a prior deploy without service_hostname)
+        # causes the UI to generate unreachable workflow log/spec URLs.
+        if curr_service_configs.service_base_url != expected_url:
+            config_service.patch_service_configs(
+                request=config_objects.PatchConfigRequest(
+                    configs_dict={
+                        'service_base_url': expected_url
+                    }
+                ),
+                username='System',
+            )
+
+            logging.info(
+                'Set service_base_url to deployment hostname: %s',
+                postgres.config.service_hostname)
         return
 
-    if postgres.config.service_hostname:
-        config_service.patch_service_configs(
-            request=config_objects.PatchConfigRequest(
-                configs_dict={
-                    'service_base_url': f'https://{postgres.config.service_hostname}'
-                }
-            ),
-            username='System',
-        )
-
-        logging.info(
-            'Using deployment hostname for service_base_url: %s',
-            postgres.config.service_hostname)
+    # No hostname configured — skip if any URL is already set
+    if curr_service_configs.service_base_url:
+        return
 
 
 def set_client_install_url(postgres: connectors.PostgresConnector,
