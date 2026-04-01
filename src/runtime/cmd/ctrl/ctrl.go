@@ -1401,19 +1401,22 @@ func main() {
 	signal.Notify(sigintCatch, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigintCatch
+		log.Println("SIGTERM received, starting graceful shutdown...")
 		if uploading.Load() {
-			log.Println("SIGTERM received during upload, waiting for completion...")
+			log.Println("Upload in progress, waiting for completion...")
 			select {
 			case <-uploadDone:
-				log.Println("Upload completed after SIGTERM, exiting gracefully")
-				cleanupMounts(cmdArgs.DownloadType)
-				os.Exit(0)
+				log.Println("Upload completed after SIGTERM")
 			case <-time.After(9 * time.Minute):
-				log.Println("Upload drain timeout exceeded, forcing exit")
+				log.Println("Upload drain timeout exceeded")
 			}
 		}
+		// Flush log channels before exiting — os.Exit bypasses defers
+		stopPutLogs <- true
+		stopSendLogs <- true
+		waitGoRoutines.Wait()
 		cleanupMounts(cmdArgs.DownloadType)
-		os.Exit(1)
+		os.Exit(0)
 	}()
 
 	// Validate data auth access before starting downloads/uploads
