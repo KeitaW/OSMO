@@ -1531,17 +1531,23 @@ execLogs:
 		MetricType: "output_upload"}
 	metricChan <- uploadTimes
 
-	// Wait for sendLogs to drain all user logs before sending LogDone.
-	// sendLogs processes one message per 100ms tick; wait until the queue is empty.
-	for i := 0; i < 300; i++ { // max 30 seconds
-		bufferMutex.Lock()
-		empty := logQueue.IsEmpty()
-		bufferMutex.Unlock()
-		if empty {
+	// Flush all remaining user logs directly before sending LogDone.
+	// sendLogs runs on a ticker and may not have drained the queue yet.
+	// We must flush here while the websocket is still open — after LogDone,
+	// the logger closes the connection and any remaining logs are lost.
+	bufferMutex.Lock()
+	for !logQueue.IsEmpty() {
+		logJson, err := logQueue.Peek()
+		if err != nil {
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
+		if err := messages.Put(webConn, logJson); err != nil {
+			log.Printf("Failed to flush log before LogDone: %v", err)
+			break
+		}
+		logQueue.Pop()
 	}
+	bufferMutex.Unlock()
 
 	logMsg := messages.CreateLog(cmdArgs.LogSource, "", messages.LogDone)
 	for !logsFinished {
