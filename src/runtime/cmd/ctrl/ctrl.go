@@ -1531,6 +1531,18 @@ execLogs:
 		MetricType: "output_upload"}
 	metricChan <- uploadTimes
 
+	// Wait for sendLogs to drain all user logs before sending LogDone.
+	// sendLogs processes one message per 100ms tick; wait until the queue is empty.
+	for i := 0; i < 300; i++ { // max 30 seconds
+		bufferMutex.Lock()
+		empty := logQueue.IsEmpty()
+		bufferMutex.Unlock()
+		if empty {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	logMsg := messages.CreateLog(cmdArgs.LogSource, "", messages.LogDone)
 	for !logsFinished {
 		threadsafeEnqueue(logQueue, logMsg)
