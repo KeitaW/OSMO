@@ -871,8 +871,25 @@ func sendLogs(logSource string, logQueue *common.CircularBuffer, logsPeriodMs in
 	for {
 		select {
 		case <-stopChan:
+			// Drain remaining logs before exiting
+			for {
+				bufferMutex.Lock()
+				logJson, err := logQueue.Peek()
+				if err != nil {
+					bufferMutex.Unlock()
+					break
+				}
+				err = messages.Put(webConn, logJson)
+				if err != nil {
+					log.Println("Failed to send log during drain:", err)
+					bufferMutex.Unlock()
+					break
+				}
+				logQueue.Pop()
+				bufferMutex.Unlock()
+			}
 			defer waitGoRoutines.Done()
-			log.Println("Goroutine sendLogs is done")
+			log.Println("Goroutine sendLogs is done, queue drained")
 			return
 		case <-ticker.C:
 			if data.WebsocketConnection.IsBroken {
