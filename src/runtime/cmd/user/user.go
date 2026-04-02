@@ -419,7 +419,6 @@ func main() {
 		if response.Type == messages.CtrlFailed {
 			return
 		} else if response.Type == messages.ExecStart {
-			log.Printf("ExecStart received, command=%s args=%v", cmdArgs.Command, cmdArgs.Args)
 			break
 		} else {
 			log.Printf("Ignore unexpected Type: %s", response.Type)
@@ -468,7 +467,6 @@ func main() {
 		go data.Checkpoint(opsChan, checkpoint, &waitCheckpoint, &stopCheckpoint)
 	}
 	waitUserCommands.Wait()
-	log.Printf("User command finished: msg=%q err=%v", cmdMsg, cmdErr)
 	execFinished = true
 	stopCheckpoint = true
 	waitCheckpoint.Wait()
