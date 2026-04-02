@@ -1436,8 +1436,12 @@ func main() {
 		os.Exit(0)
 	}()
 
-	// Validate data auth access before starting downloads/uploads
-	if err := data.ValidateInputsOutputsAccess(
+	// Validate data auth access before starting downloads/uploads.
+	// Honor OSMO_SKIP_DATA_AUTH set by the service when
+	// credential_config.disable_data_validation includes "*" or "s3".
+	if os.Getenv("OSMO_SKIP_DATA_AUTH") == "1" {
+		osmoChan <- "Data validation skipped (OSMO_SKIP_DATA_AUTH=1)"
+	} else if err := data.ValidateInputsOutputsAccess(
 		cmdArgs.Inputs,
 		cmdArgs.Outputs,
 		cmdArgs.UserConfig,
